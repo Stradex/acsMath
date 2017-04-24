@@ -1,0 +1,653 @@
+/*
+*	Functions to work with matrices
+*	
+*/
+
+//USE THE FUNCTIONS TO WORK WITH MATRICES, NEVER USE THEM DIRECTLY FROM THIS ARRAYS
+int vMathTmpMatrixData[MATH_MAXMATRICES][4]; //0: Is being used (0 == false), 1: rows, 2: cols
+int vMathTmpMatrix[MATH_MAXMATRICES][MATH_MAXROWSACOLS][MATH_MAXROWSACOLS];
+
+int vMathFreeIndices[MATH_MAXMATRICES]; //The free indices to use
+int vMathFreeIndicesLength = 0;
+
+int vMathTmpPrivates = 0;
+int vMathTmpPrivateMatrixSize[MATH_MAXPRIVATES];
+int vMathTmpPrivateMatrix[MATH_MAXPRIVATES][MATH_MAXROWSACOLS][MATH_MAXROWSACOLS]; //local matrix for doing stuff in the library, DON'T TOUCH IT
+
+int vMathMatricesCreated=0;
+
+function bool mathMatrixFreeIndexExists(int index)
+{
+	for (int i=0; i < vMathFreeIndicesLength; i++)
+	{
+		if (vMathFreeIndices[i] == index)
+			return MATH_TRUE;
+	}
+	return MATH_FALSE;
+}
+
+function int mathGetMatrixFreeIndex(void)
+{
+	
+	if (vMathFreeIndicesLength > 0)
+		return vMathFreeIndices[0];
+	
+	return -1;
+}
+function void mathRemoveMatrixFreeIndex(int index)
+{
+	int i, j;
+	bool foundIndex=MATH_FALSE;
+	for (i=0; i < vMathFreeIndicesLength; i++)
+	{
+		if (index == vMathFreeIndices[i])
+		{
+			foundIndex = MATH_TRUE;
+			continue;
+		}
+		vMathFreeIndices[j] = vMathFreeIndices[i];
+	}
+	if (foundIndex)
+		vMathFreeIndicesLength--;
+	
+	return;
+}
+
+/*
+*	Creates a matrix with all the values with 0
+*
+*	@param int rows - Number of rows
+*	@param int cols	- Number of cols
+*
+*	@return int - index of the matrix being used [-1 if error]
+**/
+
+function int mathCreateMatrix(int rows, int cols, int matrixType)
+{
+	if (rows <= 0 || cols <= 0 || matrixType < 0 || matrixType > 1)
+		return -1;
+	
+	int newIndex = mathGetMatrixFreeIndex();
+	if (newIndex >= 0)	//Try first with a index of a deleted matrix
+	{
+		mathRemoveMatrixFreeIndex(newIndex);
+	} else {			//if there arent deleted matrices, then create a new index
+		if (vMathMatricesCreated >= MATH_MAXMATRICES)	//No more matrixs allowed!!
+			return -1;
+		newIndex = vMathMatricesCreated++;
+	}
+	
+	vMathTmpMatrixData[newIndex][0] = 1;
+	vMathTmpMatrixData[newIndex][1] = rows;
+	vMathTmpMatrixData[newIndex][2] = cols;
+	vMathTmpMatrixData[newIndex][3] = matrixType;
+	
+	int i, j;
+	for (i=0; i < vMathTmpMatrixData[newIndex][1]; i++)
+		for (j=0; j < vMathTmpMatrixData[newIndex][2]; j++)
+			vMathTmpMatrix[newIndex][i][j] = 0;
+	
+	return newIndex;
+}
+
+/*
+*	Clone a matrix
+*
+*	@param int index - the index of the matrix who's going to be cloned
+*
+*	@return int - the index of the new vector
+*/
+
+function int mathCloneMatrix(int index)
+{
+	if (index < 0 || index >= vMathMatricesCreated)
+		return -1;
+	int newMatrix = mathCreateMatrix(vMathTmpMatrixData[index][1], vMathTmpMatrixData[index][2], vMathTmpMatrixData[index][3]);
+	if (newMatrix < 0)
+		return -1;
+
+	int i, j;
+	for (i=0; i < vMathTmpMatrixData[newMatrix][1]; i++)
+		for (j=0; j < vMathTmpMatrixData[newMatrix][2]; j++)
+			vMathTmpMatrix[newMatrix][i][j] = vMathTmpMatrix[index][i][j];
+	
+	return newMatrix;
+}
+
+function void mathDeleteMatrix(int index)
+{
+	if (index < 0 || index >= vMathMatricesCreated)
+		return;
+	if (mathMatrixFreeIndexExists(index))
+		return; //Matrix already removed
+
+	int i, j;
+	for (i=0; i < vMathTmpMatrixData[index][1]; i++)
+		for (j=0; j < vMathTmpMatrixData[index][2]; j++)
+			vMathTmpMatrix[index][i][j] = 0;
+			
+	vMathTmpMatrixData[index][0] = 0;
+	vMathTmpMatrixData[index][1] = 0;
+	vMathTmpMatrixData[index][2] = 0;
+	vMathTmpMatrixData[index][3] = 0;
+	
+	vMathFreeIndices[vMathFreeIndicesLength++]=index;
+	
+	return;
+}
+
+/*
+*	Get the information of a matrix and
+*	put it into a string (perfect for debug) 
+*
+*	@param int index - The index of the matrix you wanna use
+*	
+*	@return str - The string containing the values from the matrix in a friendly-view
+**/
+
+function str mathMatrixInfo(int index)
+{
+	if (index < 0 || index >= vMathMatricesCreated)
+		return "[ERROR]: The matrix index you give was invalid!";
+
+	int i, j;
+	str returnData = "[";
+	for (i=0; i < vMathTmpMatrixData[index][1]; i++)
+	{
+		for (j=0; j < vMathTmpMatrixData[index][2]; j++)
+		{
+			switch (vMathTmpMatrixData[index][3])
+			{
+				case MATH_FLOAT: 
+					returnData = strparam(s: returnData, s:" ", f:vMathTmpMatrix[index][i][j]);
+				break;
+				
+				case MATH_INTEGER: //this line is online for readability
+				default:
+					returnData = strparam(s: returnData, s:" ", d:vMathTmpMatrix[index][i][j]);
+				break;
+			}
+		}
+		if (i < vMathTmpMatrixData[index][1]-1) //Not the last row
+			returnData = strparam(s: returnData, s:"\n ");
+	}
+	returnData = strparam(s: returnData, s:"]");
+	return returnData;
+} 
+
+/*
+*	Converts a matrix into an identity matrix
+*
+*	IT ONLY WORKS is the matrix is n*n (rows=cols)
+*
+*	@param int index - the index of the matrix going to be converted into an identity matrix
+*
+*	@return bool - TRUE if the conversion was done properly, FALSE if something fails [like rows!=cols or index invalid]
+**/
+
+function bool mathMatrixIdentity(int index)
+{
+	if (index < 0 || index >= vMathMatricesCreated)
+		return MATH_FALSE;
+
+	if (vMathTmpMatrixData[index][1] != vMathTmpMatrixData[index][2])
+		return MATH_FALSE;
+	
+	int i, j;
+	for (i=0; i < vMathTmpMatrixData[index][1]; i++)
+	{
+		for (j=0; j < vMathTmpMatrixData[index][2]; j++)
+		{
+			if (i==j)
+			{
+				switch (vMathTmpMatrixData[index][3])
+				{
+					case MATH_FLOAT: 
+						vMathTmpMatrix[index][i][j] = 1.0;
+					break;
+					case MATH_INTEGER: //this line is online for readability
+					default:
+						vMathTmpMatrix[index][i][j] = 1;
+					break;
+				}
+			} else {
+				vMathTmpMatrix[index][i][j] = 0;
+			}
+		}
+	}
+	
+	return MATH_TRUE;
+}
+
+/*
+*	Transpose a matrix
+*
+*
+*	@param int index - the index of the matrix going to be transposed
+*
+*	@return bool - TRUE if the transpose was done properly, FALSE if something fails
+**/
+
+function bool mathMatrixTranspose(int index)
+{
+	if (index < 0 || index >= vMathMatricesCreated)
+		return MATH_FALSE;
+
+	int i, j;
+	//1. Copy of the matrix
+	
+	for (i=0; i < vMathTmpMatrixData[index][1]; i++)
+		for (j=0; j < vMathTmpMatrixData[index][2]; j++)
+			vMathTmpPrivateMatrix[0][i][j] = vMathTmpMatrix[index][i][j];
+	
+	int oldRows = vMathTmpMatrixData[index][1];
+	
+	vMathTmpMatrixData[index][1] = vMathTmpMatrixData[index][2];
+	vMathTmpMatrixData[index][2] = vMathTmpMatrixData[index][1];
+	
+	for (i=0; i < vMathTmpMatrixData[index][1]; i++)
+		for (j=0; j < vMathTmpMatrixData[index][2]; j++)
+			vMathTmpMatrix[index][i][j] = vMathTmpPrivateMatrix[0][j][i];
+	
+	return MATH_TRUE;
+}
+
+/*
+*	Allows you to set directly a value for the matrix
+*
+*	@param int index - the index of the matrix you wanna modify a value
+*	
+*	@param int row - The row where the value is going to be located [START IN 0!! NOT 1]
+*	@param int col - the col where the value is going to be located [START IN 0!! NOT 1]
+*	@param int value - The value to set
+*
+*	@return bool - TRUE if the change was done, FALSE if something fails
+**/
+function bool mathMatrixSetValue(int index, int row, int col, int value)
+{
+	if (index < 0 || index >= vMathMatricesCreated || row < 0 || row >= vMathTmpMatrixData[index][1] || col < 0 || col >= vMathTmpMatrixData[index][2])
+		return MATH_FALSE;
+
+	vMathTmpMatrix[index][row][col] = value;
+	
+	return MATH_TRUE;
+}
+
+/*
+*	Allows you to get the value from a specific position in the matrix
+*
+*	@param int index - the index of the matrix you wanna modify a value
+*	
+*	@param int row - The row where the value is located [START IN 0!! NOT 1]
+*	@param int col - the col where the value is located [START IN 0!! NOT 1]
+*
+*	@return int - (-1 if MAYBE something fails)
+**/
+
+function int mathMatrixGetValue(int index, int row, int col)
+{
+	if (index < 0 || index >= vMathMatricesCreated || row < 0 || row >= vMathTmpMatrixData[index][1] || col < 0 || col >= vMathTmpMatrixData[index][2])
+	{
+		Log(s: "invalid operation at mathMatrixGetValue()");
+		return -1;
+	}
+	return vMathTmpMatrix[index][row][col];
+}
+
+function int mathMatrixGetIntValue(int index, int row, int col)
+{
+	if (index < 0 || index >= vMathMatricesCreated || row < 0 || row >= vMathTmpMatrixData[index][1] || col < 0 || col >= vMathTmpMatrixData[index][2])
+	{
+		Log(s: "invalid operation at mathMatrixGetValue()");
+		return -1;
+	}
+	if (vMathTmpMatrixData[index][3] == MATH_INTEGER)
+		return vMathTmpMatrix[index][row][col];
+	
+	//MATH_FLOAT
+	return mathFixedRound(vMathTmpMatrix[index][row][col]);
+}
+
+function int mathMatrixGetFloatValue(int index, int row, int col)
+{
+	if (index < 0 || index >= vMathMatricesCreated || row < 0 || row >= vMathTmpMatrixData[index][1] || col < 0 || col >= vMathTmpMatrixData[index][2])
+	{
+		Log(s: "invalid operation at mathMatrixGetValue()");
+		return -1;
+	}
+	if (vMathTmpMatrixData[index][3] == MATH_FLOAT)
+		return vMathTmpMatrix[index][row][col];
+	
+	//MATH_INTEGER
+	return mathIntToFixed(vMathTmpMatrix[index][row][col]);
+}
+
+
+/*
+*	Matrix Sum
+*
+*	@param int out - The index of the matrix where the result is going to be saved
+*	
+*	@param int a - The index of the first matrix
+*	@param int b - The index of the second matrix
+*
+*	@return bool - TRUE if the sum was done properly
+**/
+
+function bool mathMatrixAdd(int out, int a, int b)
+{
+	if (out < 0 || out >= vMathMatricesCreated || a < 0 || a >= vMathMatricesCreated || b < 0 || b >= vMathMatricesCreated)
+		return MATH_FALSE;
+	if (vMathTmpMatrixData[a][1] != vMathTmpMatrixData[b][1] || vMathTmpMatrixData[a][2] != vMathTmpMatrixData[b][2] || vMathTmpMatrixData[out][1] != vMathTmpMatrixData[b][1] ||vMathTmpMatrixData[out][2] != vMathTmpMatrixData[b][2])
+		return MATH_FALSE;
+		
+	int i, j;
+	for (i=0; i < vMathTmpMatrixData[out][1]; i++)
+		for (j=0; j < vMathTmpMatrixData[out][2]; j++)
+			vMathTmpMatrix[out][i][j] = vMathTmpMatrix[a][i][j] + vMathTmpMatrix[b][i][j];
+	
+	return MATH_TRUE;
+}
+
+/*
+*	Matrix Subtraction
+*
+*	@param int out - The index of the matrix where the result is going to be saved
+*	
+*	@param int a - The index of the first matrix
+*	@param int b - The index of the second matrix
+*
+*	@return bool - TRUE if the sub was done properly
+**/
+
+function bool mathMatrixSub(int out, int a, int b)
+{
+	if (out < 0 || out >= vMathMatricesCreated || a < 0 || a >= vMathMatricesCreated || b < 0 || b >= vMathMatricesCreated)
+		return MATH_FALSE;
+	if (vMathTmpMatrixData[a][1] != vMathTmpMatrixData[b][1] || vMathTmpMatrixData[a][2] != vMathTmpMatrixData[b][2] || vMathTmpMatrixData[out][1] != vMathTmpMatrixData[b][1] ||vMathTmpMatrixData[out][2] != vMathTmpMatrixData[b][2])
+		return MATH_FALSE;
+	
+	int i, j;
+	for (i=0; i < vMathTmpMatrixData[out][1]; i++)
+		for (j=0; j < vMathTmpMatrixData[out][2]; j++)
+			vMathTmpMatrix[out][i][j] = vMathTmpMatrix[a][i][j] - vMathTmpMatrix[b][i][j];
+	
+	return MATH_TRUE;
+}
+
+/*
+*	Matrix multiply
+
+*	@param int out - The index of the matrix where the result is going to be saved
+*
+*	@param int a - The index of the first matrix
+*	@param int b - The index of the second matrix
+*
+*	@return bool - TRUE if the multiply was done properly
+**/
+
+function bool mathMatrixMultiply(int out, int a, int b)
+{
+	if (out < 0 || out >= vMathMatricesCreated || a < 0 || a >= vMathMatricesCreated || b < 0 || b >= vMathMatricesCreated)
+		return MATH_FALSE;
+		
+	if (vMathTmpMatrixData[a][2] != vMathTmpMatrixData[b][1])
+		return MATH_FALSE;	//No se puede hacer la multipliacion matricial
+		
+	int newCols = vMathTmpMatrixData[b][2];
+	int newRows = vMathTmpMatrixData[a][1];
+	
+	if (vMathTmpMatrixData[out][1] != newRows || vMathTmpMatrixData[out][2] != newCols)
+		return MATH_FALSE;	//No se puede hacer la multipliacion matricial
+
+	int i, j, z;
+	for (i=0; i < vMathTmpMatrixData[out][1]; i++)
+	{
+		for (j=0; j < vMathTmpMatrixData[out][2]; j++)
+		{
+			vMathTmpPrivateMatrix[0][i][j] = 0;
+			for (z=0; z < vMathTmpMatrixData[a][2]; z++)
+			{
+				switch (vMathTmpMatrixData[out][3])
+				{
+					case MATH_FLOAT:
+						vMathTmpPrivateMatrix[0][i][j] += FixedMul(mathMatrixGetFloatValue(a, i, z), mathMatrixGetFloatValue(b, z, j));
+					break;
+					
+					case MATH_INTEGER:
+					default:
+						vMathTmpPrivateMatrix[0][i][j] += mathMatrixGetIntValue(a, i, z)*mathMatrixGetIntValue(b, z, j);
+					break;
+				}
+			}
+		}
+	}
+	
+	for (i=0; i < vMathTmpMatrixData[out][1]; i++)
+		for (j=0; j < vMathTmpMatrixData[out][2]; j++)
+			vMathTmpMatrix[out][i][j] = vMathTmpPrivateMatrix[0][i][j];
+	
+	return MATH_TRUE;
+}
+
+/*
+*	Matrix Determinant
+*
+*	@param int index - The index of the matrix which we want to calculate the determinant
+*
+*	@return int - Determinant Value
+**/
+
+function int mathMatrixDet(int index)
+{
+
+	int size=0;
+	int i, j, z, p=0, k=0;
+	int determinant = 1.0;
+	
+	if (index < -1 || index >= vMathMatricesCreated)
+	{
+		Log(s: "Error!, the matrix index passed is invalid [in mathMatrixDet(...) function]");
+		return -1; //-1 CAN BE false
+	}
+	if (vMathTmpMatrixData[index][1] != vMathTmpMatrixData[index][2])
+	{
+		Log(s: "Error!, the matrix dimensions make imposible to calculate the determinant [in mathMatrixDet(...) function]");
+		return -1;
+	}
+	
+	size = vMathTmpMatrixData[index][1];
+
+	//1. Copy of the matrix
+	
+	for (i=0; i < vMathTmpMatrixData[index][1]; i++)
+		for (j=0; j < vMathTmpMatrixData[index][2]; j++)
+			vMathTmpPrivateMatrix[0][i][j] = mathMatrixGetFloatValue(index, i, j);	
+
+	//2. calculate determinant
+	bool signPositive = MATH_TRUE;
+	for (i=0, j=0; i < size; i++, j++)
+	{
+		if (vMathTmpPrivateMatrix[0][i][j] == 0)	//normalize
+		{
+			bool success=MATH_FALSE;
+			for (p=i+1; p < size; p++)
+			{
+				if (vMathTmpPrivateMatrix[0][p][j] == 0)
+					continue;
+				
+
+				for (k=0; k < size; k++)
+					vMathTmpPrivateMatrix[1][0][k] = vMathTmpPrivateMatrix[0][i][k]; //temporal vector
+					
+				for (z=0; z < size; z++)
+				{
+					vMathTmpPrivateMatrix[0][i][z] = vMathTmpPrivateMatrix[0][p][z];
+					vMathTmpPrivateMatrix[0][p][z] = vMathTmpPrivateMatrix[1][0][z];
+				}
+				
+				signPositive = !signPositive;
+				success=MATH_TRUE;
+				break;
+			}
+			if (!success)
+				return 0; //The determinant is 0 :(
+
+		}
+
+		for (z=i+1; z < size; z++)
+		{
+			int modifier = -FixedDiv(vMathTmpPrivateMatrix[0][z][j], vMathTmpPrivateMatrix[0][i][j]);
+			for (p=0; p < size; p++)
+			{
+				vMathTmpPrivateMatrix[0][z][p] = vMathTmpPrivateMatrix[0][z][p]+FixedMul(modifier, vMathTmpPrivateMatrix[0][i][p]);
+			}
+		}
+	}
+	for (i=0, j=0; i < size; i++,j++)
+		determinant = FixedMul(determinant, vMathTmpPrivateMatrix[0][i][j]);
+	if (!signPositive)
+		determinant = -determinant;
+	return determinant;
+}
+
+/*
+*	Calculate the inverse of a matrix
+*
+*	@param int out - The index of the matrix where the result is going to be saved [MUST BE MATH_FLOAT]
+*	@param int index - The index of the matrix we want to calculate the inverse
+*
+*	@return bool- TRUE if was posible to calculate it
+**/
+
+function bool mathMatrixInverse(int out, int index)
+{
+	if (index < -1 || index >= vMathMatricesCreated)
+		return MATH_FALSE;
+	if (vMathTmpMatrixData[index][1] != vMathTmpMatrixData[index][2])
+		return MATH_FALSE;
+	
+	int size=vMathTmpMatrixData[index][1];
+	int i, j, z, p=0, k=0;
+	
+	//1. Convert the temporal matrix (0) into a identity
+	for (i=0; i < size; i++)
+	{
+		for (j=0; j < size; j++)
+		{
+			if (j==i)
+				vMathTmpPrivateMatrix[0][i][j] = 1.0;
+			else
+				vMathTmpPrivateMatrix[0][i][j] = 0.0;
+		}
+	}
+	//2. Copy the original matrix into the temporal matrix (1)
+	for (i=0; i < size; i++)
+		for (j=0; j < size; j++)
+			vMathTmpPrivateMatrix[1][i][j] = mathMatrixGetFloatValue(index, i, j);	
+	
+	//3. calculate inverse
+	int modifier;
+	for (i=0, j=0; i < size; i++, j++)
+	{
+		if (vMathTmpPrivateMatrix[1][i][j] == 0)	//normalize
+		{
+			bool success=MATH_FALSE;
+			for (p=i+1; p < size; p++)
+			{
+				if (vMathTmpPrivateMatrix[1][p][j] == 0)
+					continue;
+					
+				for (k=0; k < size; k++)
+				{
+					vMathTmpPrivateMatrix[2][0][k] = vMathTmpPrivateMatrix[1][i][k]; //temporal vector
+					vMathTmpPrivateMatrix[2][1][k] = vMathTmpPrivateMatrix[0][i][k]; //temporal vector
+				}	
+				for (z=0; z < size; z++)
+				{
+					vMathTmpPrivateMatrix[1][i][z] = vMathTmpPrivateMatrix[1][p][z];
+					vMathTmpPrivateMatrix[1][p][z] = vMathTmpPrivateMatrix[2][0][z];
+					
+					vMathTmpPrivateMatrix[0][i][z] = vMathTmpPrivateMatrix[0][p][z];
+					vMathTmpPrivateMatrix[0][p][z] = vMathTmpPrivateMatrix[2][1][z];
+				}
+				success=MATH_TRUE;
+				break;
+			}
+			if (!success)
+				return MATH_FALSE; //We can't calculate the inverse
+		}
+		//put 0s under and up the same column, and modify the others
+		for (z=0; z < size; z++)
+		{	
+			if (z==i)
+				continue;
+			modifier = -FixedDiv(vMathTmpPrivateMatrix[1][z][j], vMathTmpPrivateMatrix[1][i][j]);
+			for (p=0; p < size; p++)
+			{
+				vMathTmpPrivateMatrix[0][z][p] = vMathTmpPrivateMatrix[0][z][p]+FixedMul(modifier, vMathTmpPrivateMatrix[0][i][p]); //inverse
+			
+				if (p >= j)
+					vMathTmpPrivateMatrix[1][z][p] = vMathTmpPrivateMatrix[1][z][p]+FixedMul(modifier, vMathTmpPrivateMatrix[1][i][p]);
+			
+			}
+			//the inverse
+		}
+		//modify the current pointer to make it 1
+		modifier = vMathTmpPrivateMatrix[1][i][j];
+		
+		if (modifier == 0)
+			return MATH_FALSE;  //THIS SHOULD NOT HAPPEN
+		
+		for (z=0; z < size; z++)
+		{
+			vMathTmpPrivateMatrix[0][i][z] = FixedDiv(vMathTmpPrivateMatrix[0][i][z], modifier);
+			vMathTmpPrivateMatrix[1][i][z] = FixedDiv(vMathTmpPrivateMatrix[1][i][z], modifier);
+		}
+	}
+	//4. copy the modified into a new matrix
+	for (i=0; i < size; i++)
+		for (j=0; j < size; j++)
+			vMathTmpMatrix[out][i][j] = vMathTmpPrivateMatrix[0][i][j];	
+			
+	return MATH_TRUE;
+}
+
+//Shorthands
+
+function int mathCreateMat2(int matrixType, int v0, int v1, int v2, int v3)
+{
+	int tmpIndex = mathCreateMatrix(2, 2, matrixType);
+	if (tmpIndex == -1)
+		return -1;
+	
+	mathMatrixSetValue(tmpIndex, 0, 0, v0);
+	mathMatrixSetValue(tmpIndex, 0, 1, v1);
+	mathMatrixSetValue(tmpIndex, 1, 0, v2);
+	mathMatrixSetValue(tmpIndex, 1, 1, v3);
+	
+	return tmpIndex;
+}
+
+function int mathCreateMat3(int matrixType, int v0, int v1, int v2, int v3, int v4, int v5, int v6, int v7, int v8)
+{
+	int tmpIndex = mathCreateMatrix(3, 3, matrixType);
+	if (tmpIndex == -1)
+		return -1;
+	
+	mathMatrixSetValue(tmpIndex, 0, 0, v0);
+	mathMatrixSetValue(tmpIndex, 0, 1, v1);
+	mathMatrixSetValue(tmpIndex, 0, 2, v2);
+	mathMatrixSetValue(tmpIndex, 1, 0, v3);
+	mathMatrixSetValue(tmpIndex, 1, 1, v4);
+	mathMatrixSetValue(tmpIndex, 1, 2, v5);
+	mathMatrixSetValue(tmpIndex, 2, 0, v6);
+	mathMatrixSetValue(tmpIndex, 2, 1, v7);
+	mathMatrixSetValue(tmpIndex, 2, 2, v8);
+	
+	return tmpIndex;
+}
+
+/*
+*	TRANSFORMATIONS (La semana que viene)
+**/

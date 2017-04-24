@@ -1,0 +1,118 @@
+#include "zcommon.acs"
+
+function bool SetActorVelocityVec3(int tid, int v, bool add, bool setbob)
+{
+	if (v < 0 || v >= mVectorsUsed)
+		return false;
+		
+	if (mVectorData[v][0] < 3)
+		return false;
+	
+	switch(mVectorData[v][1])
+	{
+		case MATH_FLOAT:
+			SetActorVelocity(tid, mVectorValues[v][0], mVectorValues[v][1], mVectorValues[v][2], add, setbob);
+		break;
+		case MATH_INTEGER:
+		default:
+			SetActorVelocity(tid, mathFixedRound(mVectorValues[v][0]), mathFixedRound(mVectorValues[v][1]), mathFixedRound(mVectorValues[v][2]), add, setbob);
+		break;
+	}
+	return true;
+}
+
+function bool GetActorVelocityVec3(int tid, int out)
+{
+	if (out < 0 || out >= mVectorsUsed)
+		return false;
+		
+	if (mVectorData[out][0] < 3)
+		return false;
+	
+	mVectorValues[out][0] = GetActorVelX(tid);
+	mVectorValues[out][1] = GetActorVelY(tid);
+	mVectorValues[out][2] = GetActorVelZ(tid);
+
+	return true;
+}
+
+function bool SetActorPositionVec3(int tid, int v, bool fog)
+{
+	if (v < 0 || v >= mVectorsUsed)
+		return false;
+		
+	if (mVectorData[v][0] < 3)
+		return false;
+	
+	switch(mVectorData[v][1])
+	{
+		case MATH_FLOAT:
+			SetActorPosition(tid, mVectorValues[v][0], mVectorValues[v][1], mVectorValues[v][2], fog);
+		break;
+		case MATH_INTEGER:
+		default:
+			SetActorPosition(tid, mathFixedRound(mVectorValues[v][0]), mathFixedRound(mVectorValues[v][1]), mathFixedRound(mVectorValues[v][2]), fog);
+		break;
+	}
+	return true;
+}
+
+function bool GetActorPositionVec3(int tid, int out)
+{
+	if (out < 0 || out >= mVectorsUsed)
+		return false;
+		
+	if (mVectorData[out][0] < 3)
+		return false;
+	
+	mVectorValues[out][0] = GetActorX(tid);
+	mVectorValues[out][1] = GetActorY(tid);
+	mVectorValues[out][2] = GetActorZ(tid);
+
+	return true;
+}
+
+function int SpawnVec3(str classname, int v, int tid, int angle)
+{
+	if (v < 0 || v >= mVectorsUsed)
+		return 0;
+		
+	if (mVectorData[v][0] < 3)
+		return 0;
+	
+	int thingsSpawned= 0;
+	switch(mVectorData[v][1])
+	{
+		case MATH_FLOAT:
+			thingsSpawned = Spawn(classname, mVectorValues[v][0], mVectorValues[v][1], mVectorValues[v][2], tid, angle);
+		break;
+		case MATH_INTEGER:
+		default:
+			thingsSpawned = Spawn(classname, mathFixedRound(mVectorValues[v][0]), mathFixedRound(mVectorValues[v][1]), mathFixedRound(mVectorValues[v][2]), tid, angle);
+		break;
+	}
+	return thingsSpawned;
+}
+
+function int SpawnForcedVec3(str classname, int v, int tid, int angle)
+{
+	if (v < 0 || v >= mVectorsUsed)
+		return false;
+		
+	if (mVectorData[v][0] < 3)
+		return false;
+	
+	
+	int thingsSpawned= 0;
+	switch(mVectorData[v][1])
+	{
+		case MATH_FLOAT:
+			thingsSpawned = SpawnForced(classname, mVectorValues[v][0], mVectorValues[v][1], mVectorValues[v][2], tid, angle);
+		break;
+		case MATH_INTEGER:
+		default:
+			thingsSpawned = SpawnForced(classname, mathFixedRound(mVectorValues[v][0]), mathFixedRound(mVectorValues[v][1]), mathFixedRound(mVectorValues[v][2]), tid, angle);
+		break;
+	}
+	return thingsSpawned;
+}

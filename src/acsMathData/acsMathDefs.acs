@@ -1,0 +1,18 @@
+/*
+*	Constants
+**/
+
+#libdefine	MATH_PI				3.141592654
+#libdefine 	MATH_E				2.718281828
+
+#libdefine	MATH_MAXMATRICES	4098
+#libdefine  MATH_MAXROWSACOLS	25
+#libdefine  MATH_MAXPRIVATES	6	//Limite de matrices privadas
+
+#libdefine MATH_MAXVECTORS		4098
+
+#libdefine 	MATH_INTEGER	0
+#libdefine  MATH_FLOAT		1
+
+#libdefine MATH_FALSE			0
+#libdefine MATH_TRUE			1

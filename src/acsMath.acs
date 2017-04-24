@@ -1,0 +1,9 @@
+#library "acsMath"
+
+#include "acsMathDefs.acs"
+#include "acsMathBasics.acs"
+#include "acsMathConversions.acs"
+#include "acsMathVectors.acs"
+#include "acsMathMatrices.acs"
+
+#include "shorthandFuncs.acs"

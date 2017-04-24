@@ -1,0 +1,271 @@
+/*
+*	Convert a fixed value to an integer (round)
+*
+*	@param int 	fixedValue
+*	@return int integerValue (round)
+*/
+
+function int mathFixedRound(int v)
+{
+	return (v+0.5) >> 16;
+}
+
+/*
+*	Convert an integer to a fixed value
+*
+*	@param int 	intValue
+*	@return int fixedValue
+*/
+
+function int mathIntToFixed(int v)
+{
+	return v << 16;
+}
+
+
+/*
+*	|| - FUNCTIONS TO NORMALIZE ANGLES - ||
+*
+*/
+
+/*
+* Normalize a Byte angle
+*
+* @param int (the value [byte] of the angle)
+* @return int (the angle normalized between 0.0 and 255.0)
+**/
+
+function int mathNormalizeByteAngle(int byteAngle)
+{
+	while(byteAngle < 0.0)
+		byteAngle += 255.0;
+	
+	while (byteAngle > 255.0)
+		byteAngle -= 255.0;
+
+	return byteAngle;
+}
+
+/*
+* Normalize a radian angle
+*
+* @param int (the value [radian] of the angle)
+* @return int (the angle normalized between 0 and 2.PI)
+**/
+
+function int mathNormalizeRadianAngle(int radAngle)
+{
+	int twoPi = FixedMul(MATH_PI, 2.0);
+	
+	while (radAngle < 0.0)
+		radAngle += twoPi;
+		
+	while (radAngle > twoPi)
+		radAngle -= twoPi;
+
+	return radAngle;
+}
+
+/*
+* Normalize a degree angle
+*
+* @param int (the value [degrees] of the angle)
+* @return int (the angle normalized between 0 and 360)
+**/
+
+function int mathNormalizeDegreeAngle(int degAngle)
+{
+	while (degAngle < 0.0)
+		degAngle += 360.0;
+	while (degAngle > 360.0)
+		degAngle -= 360.0;
+		
+	return degAngle;
+}
+
+/*
+* Normalize a fixed point angle
+*
+* @param int (the value [fixed angle] of the angle)
+* @return int (the angle normalized between 0.0 and 1.0)
+**/
+
+function int mathNormalizeFixedAngle(int fAngle)
+{
+	while (fAngle < 0.0)
+		fAngle+= 1.0;
+		
+	while (fAngle > 1.0)
+		fAngle -= 1.0;
+
+	return fAngle;
+}
+
+/*
+*	|| - CONVERTION BETWEEN ANGLE TYPES - ||
+*/
+
+/*
+*	to Degree angle functions
+*/
+function int mathByteToDegree(int byteAngle)
+{
+	return FixedMul(byteAngle, 1.40625);
+}
+function int mathFixToDegree(int fixVal)
+{
+	return FixedMul(fixVal, 360.0);
+}
+function int mathRadToDegree(int radAngle)
+{
+	return FixedMul(radAngle, FixedMul(MATH_PI, 2.0));
+}
+
+/*
+*  to Radian angle functions
+*/
+
+function int mathDegreeToRad(int degAngle)
+{
+	return FixedMul(degAngle, FixedDiv(MATH_PI, 180.0));
+}
+
+function int mathByteToRad(int byteAngle)
+{
+	return mathDegreeToRad(mathByteToDegree(byteAngle));
+}
+
+function int mathFixToRad(int fixVal)
+{
+	return mathDegreeToRad(mathFixToDegree(fixVal));
+}
+
+/*
+*  to Byte Angle functions
+*/
+
+function int mathDegreeToByte(int degAngle)
+{
+	return FixedMul(degAngle, 0.7111);
+}
+
+function int mathRadToByte(int radAngle)
+{
+	return mathDegreeToByte(mathRadToDegree(radAngle));
+}
+
+function int mathFixToByte(int fixAngle)
+{
+	return FixedMul(fixAngle, 256.0);
+}
+
+/*
+*  to Fixed point angle functions
+*/
+
+function int mathDegreeToFix(int degAngle)
+{
+	return FixedMul(degAngle, 0.002777);
+}
+
+function int mathRadToFix(int radAngle)
+{
+	return mathDegreeToFix(mathRadToDegree(radAngle));
+}
+
+function int mathByteToFix(int byteAngle)
+{
+	return FixedDiv(byteAngle, 256.0);
+}
+
+/*
+*	|| - TRIGONOMETRIC FUNCTIONS WITH  DEGREES, RADIANS and BYTE ANGLES - ||
+*/
+
+function int mathTan (int x)	//implements tangent function, returns -1 if error (cos x = 0.0)
+{
+	if (cos(x) == 0.0)
+		return -1;
+	return FixedDiv(sin(x), cos(x));
+}
+
+//Sin, cos & tan with radians
+
+function int mathRadCos (int radAngle)
+{
+	return cos(mathRadToFix(mathNormalizeRadianAngle(radAngle)));
+}
+function int mathRadSin (int radAngle)
+{
+	return sin(mathRadToFix(mathNormalizeRadianAngle(radAngle)));
+}
+
+function int mathRadTan (int radAngle)
+{
+	return mathTan(mathRadToFix(mathNormalizeRadianAngle(radAngle)));
+}
+
+//Sin, cos & tan with degrees
+
+function int mathDegCos (int degAngle)
+{
+	return cos(mathDegreeToFix(mathNormalizeDegreeAngle(degAngle)));
+}
+function int mathDegSin (int degAngle)
+{
+	return sin(mathDegreeToFix(mathNormalizeDegreeAngle(degAngle)));
+}
+
+function int mathDegTan (int degAngle)
+{
+	return mathTan(mathDegreeToFix(mathNormalizeDegreeAngle(degAngle)));
+}
+
+//sin, cos & tan with byte angles
+
+function int mathByteCos (int byteAngle)
+{
+	return cos(mathByteToFix(mathNormalizeByteAngle(byteAngle)));
+}
+function int mathByteSin (int byteAngle)
+{
+	return sin(mathByteToFix(mathNormalizeByteAngle(byteAngle)));
+}
+
+function int mathByteTan (int byteAngle)
+{
+	return mathTan(mathByteToFix(mathNormalizeByteAngle(byteAngle)));
+}
+
+//Inversas
+
+//Values between -1.0 and 1.0 for x
+
+function int mathAcos(int x)
+{
+	int nx = FixedDiv(1.0, mathPow(x, 2));
+	nx = nx - 1.0;
+	if (nx < 0.0)
+		return 0.0; //Error, devuelvo un angulo igual a 0
+	nx = mathSqrt(nx);
+	return VectorAngle(1.0, nx);
+}
+
+function int mathAsin(int x)
+{
+	int nx = mathPow(x, 2);
+	int tmp = 1.0 - mathPow(x, 2);
+	if (tmp == 0)
+		return 0.25; //90 degrees 
+	if (tmp < 0.0)
+		return 0.0; //don't exists
+		
+	nx = FixedDiv(nx, tmp);
+	nx = mathSqrt(nx);
+	return VectorAngle(1.0,  nx);
+}
+
+function int mathAtan (int x)
+{
+	return VectorAngle(1.0, x);
+}

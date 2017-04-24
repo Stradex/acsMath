@@ -1,0 +1,131 @@
+/*
+*	Return the max between two values
+*
+*	@param int 	valA
+*	@param int 	valB
+*	@return int
+*/
+
+function int mathMax (int a, int b)
+{
+	if (a > b)
+		return a;
+	return b;
+}
+
+/*
+*	Return the min between two values
+*
+*	@param int 	valA
+*	@param int 	valB
+*	@return int
+*/
+
+function int mathMin(int a, int b)
+{
+	if (a < b)
+		return a;
+	return b;
+}
+
+/*
+*	Absolute value
+*
+*	@param int (The value to be converted into a absolute value)
+*	@return int
+*/
+
+function int mathAbs(int val)
+{
+	if (val < 0.0)
+		return -val;
+	return val;
+} 
+
+/*
+*	Math Power
+*
+*	@param int (fixed point)
+*	@param int (integer)
+*	@return int
+*/
+
+
+function int mathPow(int numero, int p)
+{
+	//Solo sirve si p es un numero natural
+	if (p == 0)
+		return 1.0;
+	int i;
+	int newP = mathAbs(p);
+	int retorno = numero;
+	
+	for (i=1; i < newP; i++)
+		retorno = FixedMul(retorno, numero);
+
+	if (p < 0)
+		retorno = FixedDiv(1.0, retorno);
+		
+	return retorno;
+}
+
+
+/*
+*	SQRT From ZDOOM wiki
+*	
+*	@param int (fixed point value)
+*	@return int (fixed point value)
+*/
+
+function int mathSqrt(int number)
+{
+  int samples=15; //More samples for more accuracy
+
+  if (number == 1.0) return 1.0; 
+  if (number <= 0) return 0;
+  int val = samples<<17 + samples<<19; 
+  for (int i=0; i<samples; i++) 
+    val = (val + FixedDiv(number, val)) >> 1;
+
+  return val; 
+}
+
+/*
+*	|| - Logaritmos - ||
+*/
+
+/*
+*	This one from ZDoom is better that the one I was making before
+*/
+function int mathLogN (int x, int base)
+{
+    if (!base) base = MATH_E;
+    int integer = 0;
+
+    if (x < 1.0 && base < 1.0) return 0;
+      
+    while (x < 1)
+    {
+        integer -= 1;
+        x = FixedMul (x, base);
+    }
+    while (x >= base)
+    {
+        integer += 1;
+        x = FixedDiv (x, base);
+    }
+    int partial = 0.5;
+    x = FixedMul (x, x);
+    int decimal = 0;
+    while (partial > 1) // Actually 0.0000152587890625
+    {
+        if (x >= base)
+        {
+            decimal += partial;
+            x = FixedDiv (x, base);
+        }
+        partial = FixedMul (partial, 0.5);
+        x = FixedMul (x, x);
+    }
+    return ((integer << 16) + decimal);
+}

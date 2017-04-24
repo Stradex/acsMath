@@ -1,0 +1,661 @@
+/*
+*	Calculate the module of a 2d vector (similar to VectorLength, I don't use it because this library don't need zcommon.acs)
+*
+*	@param int vx - The X component (fixed point val)
+*	@param int vy - The Y component (fixed point val)
+*
+*	@param int - The length/module of the vector
+**/
+
+function int math2DMod(int vx, int vy)
+{
+	int mod;
+	int disminuido = 1.0;
+	
+	while (mathAbs(vx) > 200.0 || mathAbs(vy) > 200.0) //Prevent giant numbers who make ACS numbers to collapse
+	{	
+		disminuido = FixedMul(disminuido, 10.0);
+		vx = FixedDiv(vx, 10.0);
+		vy = FixedDiv(vy, 10.0);
+	}
+	mod = mathPow(vx, 2) + mathPow(vy, 2);
+	mod = mathSqrt(mod);
+	//mod = mySqrt(mod);
+	mod = FixedMul(mod, disminuido);
+	return mod;
+}
+
+/*
+*	Calculate the module of a 3d vector
+*
+*	@param int vx - The X component (fixed point val)
+*	@param int vy - The Y component (fixed point val)
+*
+*	@param int - The length/module of the vector
+**/
+
+function int math3DMod(int vx, int vy, int vz)
+{
+	int mod;
+	int disminuido = 1.0;
+	
+	while (mathAbs(vx) > 200.0 || mathAbs(vy) > 200.0 || mathAbs(vz) > 200.0)  //Prevent giant numbers who make ACS numbers to collapse
+	{	
+		disminuido = FixedMul(disminuido, 10.0);
+		vx = FixedDiv(vx, 10.0);
+		vy = FixedDiv(vy, 10.0);
+		vz = FixedDiv(vz, 10.0);
+	}
+	mod = mathPow(vx, 2) + mathPow(vy, 2) + mathPow(vz, 2);
+	mod = mathSqrt(mod);
+	//mod = mySqrt(mod);
+	mod = FixedMul(mod, disminuido);
+	return mod;
+}
+//Distancia entre dos puntos, mejor funcion hasta ahora
+function int math3DDist(int vx1, int vy1, int vz1, int vx2, int vy2, int vz2)
+{
+	return math3DMod(vx2 - vx1, vy2 - vy1, vz2 - vz1);
+}
+
+function int math2DDist(int vx1, int vy1, int vx2, int vy2)
+{
+	return math2DMod(vx2 - vx1, vy2 - vy1);
+}
+
+
+/*
+*	Working with vectors as "fake objects"
+*/
+
+int mVectorsUsed=0;
+int mVectorData[MATH_MAXVECTORS][2]; //0: Length, 1: Type of vector
+int mVectorValues[MATH_MAXVECTORS][MATH_MAXROWSACOLS];
+int mTmpVector[MATH_MAXROWSACOLS];
+
+int mTmpVectorsDestroyedLength = 0;
+int mTmpVectorsDestroyed[MATH_MAXVECTORS];
+
+
+function bool mathVectorIsDestroyed(int index)
+{
+	for (int i=0; i < mTmpVectorsDestroyedLength; i++)
+	{
+		if (mTmpVectorsDestroyed[i] == index)
+			return MATH_TRUE;
+	}
+	
+	return MATH_FALSE;
+}
+
+function bool mathVectorRemoveFromDestroyed(int index)
+{
+	int i, j;
+	bool vectorFound=MATH_FALSE;
+	for (i=0; i < mTmpVectorsDestroyedLength; i++)
+	{
+		if (mTmpVectorsDestroyed[i] == index)
+		{
+			vectorFound = MATH_TRUE;
+			continue;
+		}
+		mTmpVectorsDestroyed[j] = mTmpVectorsDestroyed[i];
+		j++;
+	}
+	if (vectorFound)
+	{
+		mTmpVectorsDestroyedLength--;
+		return MATH_TRUE;
+	}
+	return MATH_FALSE;
+}
+
+function int mathVectorGetFreeIndex(void)
+{
+	if (mTmpVectorsDestroyedLength > 0)
+		return mTmpVectorsDestroyed[0];
+	
+	return -1;
+}
+
+/*
+*	Create a Vector
+*	
+*	@param int size - The size of the vector you wanna create
+*	@param int type - The type of the vector, MATH_INTEGER (0) or MATH_FLOAT (1)
+*
+*	@return int - The index of the vector created, -1 means error
+**/
+
+function int mathCreateVector(int size, int type)
+{
+	if (size <= 1 || type < 0 || type > 1)
+		return -1;
+	
+	int tmpIndex = mathVectorGetFreeIndex();
+	if (tmpIndex != -1)
+	{
+		mathVectorRemoveFromDestroyed(tmpIndex);
+	} else {
+		if (mVectorsUsed >= MATH_MAXVECTORS)	//No more vectors allowed!
+			return -1;
+		tmpIndex = mVectorsUsed++;
+	}
+	
+	mVectorData[tmpIndex][0] = size;
+	mVectorData[tmpIndex][1] = type;
+	
+	for (int i=0; i < size; i++)
+		mVectorValues[tmpIndex][i] = 0;
+
+	return tmpIndex;
+}
+
+/*
+*	Clone a vector
+*
+*	@param int v - The vector going to clone
+*
+*	@param int - The index of the new vector
+**/
+
+function int mathCloneVector(int v)
+{
+	int newVector = mathCreateVector(mVectorData[v][0], mVectorData[v][1]);
+	
+	if (newVector < 0)
+		return newVector;
+	
+	for (int i=0; i < mVectorData[newVector][0]; i++)
+		mVectorValues[newVector][i] = mVectorValues[v][i];
+		
+	return newVector;
+}
+
+/*
+*	Destroy a vector from the array of vectors
+*
+*	@param int index - the index of the vector who's going to be destroyed
+**/
+
+function void mathDeleteVector(int index)
+{
+	if (index < 0 || index >= mVectorsUsed)
+		return;
+	if (mathVectorIsDestroyed(index)) //The vector was destroyed before (and the index remains unused)
+		return;
+	
+	for (int i=0; i < mVectorData[index][0]; i++)
+		mVectorValues[index][i] = 0;
+	
+	mVectorData[index][0] = 0;
+	mVectorData[index][1] = 0;
+	
+	mTmpVectorsDestroyed[mTmpVectorsDestroyedLength++] = index; //add the index of the vector to the garabage array
+
+	return;
+}
+
+/*
+*	Set a vector value
+*
+*	@param int index - the index of the vector you wanna set a value
+*	@param int pos - the position of the value (0, 1, 2, 3, etc..)
+*	@param int val - the value to set
+*
+*	@return bool - TRUE if the set was possible
+**/
+
+function bool mathVectorSetValue(int index, int pos, int val)
+{
+	if (index < 0 || index >= mVectorsUsed)
+		return MATH_FALSE;
+	if (pos < 0 || pos >= mVectorData[index][0])
+		return MATH_FALSE;
+	
+	mVectorValues[index][pos] = val;
+	
+	return MATH_TRUE;
+}
+
+/*
+*	Get a value from a vector
+*
+*	@param int index - the index of the vector you wanna set a value
+*	@param int pos - the position of the value (0, 1, 2, 3, etc..)
+*
+*	@return int - The vector value [Can return -1 IF MAYBE there was an error]
+**/
+
+function int mathVectorGetValue(int index, int pos)
+{
+	if (index < 0 || index >= mVectorsUsed)
+	{
+		Log(s: "Invalid vector index at: mathVectorGetValue()");
+		return -1;
+	}
+	if (pos < 0 || pos >= mVectorData[index][0])
+	{
+		Log(s: "Invalid vector value position at: mathVectorGetValue()");
+		return -1;
+	}
+	
+	return mVectorValues[index][pos];
+}
+
+/*
+*	Get a int value from a vector (force it to be integer)
+*
+*	@param int index - the index of the vector you wanna set a value
+*	@param int pos - the position of the value (0, 1, 2, 3, etc..)
+*
+*	@return int - The vector value [Can return -1 IF MAYBE there was an error]
+**/
+
+function int mathVectorGetIntVal(int index, int pos)
+{
+	if (index < 0 || index >= mVectorsUsed)
+	{
+		Log(s: "Invalid vector index at: mathVectorGetValue()");
+		return -1;
+	}
+	if (pos < 0 || pos >= mVectorData[index][0])
+	{
+		Log(s: "Invalid vector value position at: mathVectorGetValue()");
+		return -1;
+	}
+	
+	if (mVectorData[index][1] == MATH_INTEGER)
+		return mVectorValues[index][pos];
+		
+	return mathFixedRound(mVectorValues[index][pos]);
+}
+
+/*
+*	Get a float value from a vector (force it to be float)
+*
+*	@param int index - the index of the vector you wanna set a value
+*	@param int pos - the position of the value (0, 1, 2, 3, etc..)
+*
+*	@return int - The vector value [Can return -1 IF MAYBE there was an error]
+**/
+
+function int mathVectorGetFloatVal(int index, int pos)
+{
+	if (index < 0 || index >= mVectorsUsed)
+	{
+		Log(s: "Invalid vector index at: mathVectorGetValue()");
+		return -1;
+	}
+	if (pos < 0 || pos >= mVectorData[index][0])
+	{
+		Log(s: "Invalid vector value position at: mathVectorGetValue()");
+		return -1;
+	}
+	
+	if (mVectorData[index][1] == MATH_FLOAT)
+		return mVectorValues[index][pos];
+		
+	return mathIntToFixed(mVectorValues[index][pos]);
+}
+
+/*
+*	Vector add/sum
+*
+*	@param int out - index of the vector were the values are going to be saved  (out = a+b)
+*	@param int a - index of a vector
+*	@parmam int b - index of a vector
+*
+*	@param bool - TRUE if the sum/add was possible
+**/
+
+function bool mathVectorAdd(int out, int a, int b)
+{
+	if (out < 0 || out >= mVectorsUsed || a < 0 || a >= mVectorsUsed || b < 0 || b >= mVectorsUsed)
+		return MATH_FALSE;
+	if (mVectorData[a][0] != mVectorData[b][0] || mVectorData[a][0] != mVectorData[out][0]) //Check if the three vectors have the same size
+		return MATH_FALSE;
+	
+	for (int i=0; i < mVectorData[a][0]; i++)
+		mVectorValues[out][i] = mVectorValues[a][i] + mVectorValues[b][i];
+		
+	return MATH_TRUE;
+}
+
+/*
+*	Vector difference / substraction
+*
+*	@param int out - index of the vector were the values are going to be saved  (out = a-b)
+*	@param int a - index of a vector
+*	@parmam int b - index of a vector
+*
+*	@param bool - TRUE if the sum/add was possible
+**/
+
+function bool mathVectorSub(int out, int a, int b)
+{
+	if (out < 0 || out >= mVectorsUsed || a < 0 || a >= mVectorsUsed || b < 0 || b >= mVectorsUsed)
+		return MATH_FALSE;
+	if (mVectorData[a][0] != mVectorData[b][0] || mVectorData[a][0] != mVectorData[out][0]) //Check if the three vectors have the same size
+		return MATH_FALSE;
+	
+	for (int i=0; i < mVectorData[a][0]; i++)
+		mVectorValues[out][i] = mVectorValues[a][i] - mVectorValues[b][i];
+		
+	return MATH_TRUE;
+}
+
+/*
+*	Vector multiply by scalar
+*
+*	@param int out - index of the vector were the values are going to be saved (out = k*v)
+*	@param int k - the scalar who's going to multiply the vector [FIXED POINT VALUE, DON'T USE INTEGERS]
+*	@param int v - The index of the vector to multiply by the scalar
+*
+*	@return bool - TRUE if the multiply was done
+**/
+
+function bool mathVectorScalarMult(int out, int v, int k)
+{
+	if (out < 0 || out >= mVectorsUsed || v < 0 || v >= mVectorsUsed)
+		return MATH_FALSE;
+		
+	if (mVectorData[v][0] != mVectorData[out][0] ) //Check if the two vectors have the same size
+		return MATH_FALSE;
+		
+	for (int i=0; i < mVectorData[v][0]; i++)
+	{
+		switch (mVectorData[v][1])
+		{
+			case MATH_FLOAT:
+				mVectorValues[out][i] = FixedMul(k, mathVectorGetFloatVal(v, i));
+			break;
+			
+			case MATH_INTEGER: //just for readability
+			default:
+				//mVectorValues[out][i] = mathFixedRound(FixedMul(k, mathVectorGetFloatVal(v, i)));
+				mVectorValues[out][i] =  mathFixedRound(FixedMul(k, mathVectorGetFloatVal(v, i)));
+			break;
+		}
+	}
+	return MATH_TRUE;
+}
+
+/*
+*
+*	Vector Dot Product
+*
+*	@param int v	- index of a vector
+*	@param int u 	- index of a vector
+*
+*	@param int - The result of (-1 if MAYBE an error happens) (Float value)
+**/
+
+function int mathVectorDotMult(int v, int u)
+{
+	if (v < 0 || v >= mVectorsUsed || u < 0 || u >= mVectorsUsed)
+	{
+		Log(s: "Invalid vector index at mathVectorDotMult()");
+		return -1;
+	}
+	if (mVectorData[v][0] != mVectorData[u][0]) //Check if the two vectors have the same size
+	{
+		Log(s: "Unable to do mathVectorDotMult() because different vector sizes");
+		return -1;
+	}
+	
+	int result=0.0;
+	
+	for (int i=0; i < mVectorData[v][0]; i++)
+		result += FixedMul(mathVectorGetFloatVal(v, i), mathVectorGetFloatVal(u, i));
+		
+	return result;
+}
+
+/*
+*	Vector length/module
+*
+*	@param v - index of the vector we wanna calculate his length/module
+*
+*	@param int - Float value (-1 if MAYBE there's an error)
+**/
+
+function int mathVectorLength(int v)
+{
+	if (v < 0 || v >= mVectorsUsed)
+	{
+		Log(s: "Invalid vector index at mathVectorDotMult()");
+		return -1;
+	}
+	
+	int result=0.0;
+	int dim=1.0;
+	int i;
+	//1. This is for prevent fixed point number to collapse
+	for (i=0; i < mVectorData[v][0]; i++)
+	{
+		int tVal = mathVectorGetFloatVal(v, i);
+		tVal = FixedDiv(tVal, dim);
+		while (tVal > 200.0)
+		{
+			dim = FixedMul(dim, 10.0);
+			tVal = FixedDiv(tVal, 10.0);
+		}
+	}
+	
+	//2. Calculate length/module
+	for (i=0; i < mVectorData[v][0]; i++)
+		result += mathPow(FixedDiv(mathVectorGetFloatVal(v, i), dim), 2);
+		
+	result = FixedMul(mathSqrt(result), dim);
+	return result;
+}
+
+/*
+*	Return a string with the vector info
+*
+*	@param v - index of the vector we wanna get the info
+**/
+
+function str mathVectorInfo(int v)
+{
+	if (v < 0 ||v >= mVectorsUsed)
+		return "error";
+	
+	str Retorno = "[";
+	
+	for (int i=0; i < mVectorData[v][0]; i++)
+	{
+		switch (mVectorData[v][1])
+		{
+			case MATH_FLOAT:
+				Retorno = strparam(s: Retorno, f:mVectorValues[v][i]);
+			break;
+			
+			case MATH_INTEGER: //just for readability
+			default:
+				Retorno = strparam(s: Retorno, d:mVectorValues[v][i]);
+			break;
+		}
+		if (i < mVectorData[v][0]-1)
+				Retorno = strparam(s: Retorno, s:" ,");
+
+	}
+	Retorno = strparam(s: Retorno, s:"]");
+
+	return Retorno;
+}
+
+/*
+*	SHORTHANDS	
+*
+**/
+
+//Create a 2D vector
+
+function int mathCreateVec2(int type, int x, int y)
+{
+	int index =  mathCreateVector(2, type);
+	if (index < 0)
+		return -1;
+	
+	mathVectorSetValue(index, 0, x);
+	mathVectorSetValue(index, 1, y);
+	
+	return index;
+}
+
+function int mathVec2GetX(int v)
+{
+	if (v < 0 || v >= mVectorsUsed)
+	{
+		Log(s: "[ERROR] Invalid vector index at mathVec2GetX");
+		return -1;
+	}
+	if (mVectorData[v][0] < 2)
+	{
+		Log(s: "[ERROR] Invalid Vector size in mathVec2GetX");
+		return -1;
+	}
+	return mVectorValues[v][0];
+}
+
+function int mathVec2GetY(int v)
+{
+	if (v < 0 || v >= mVectorsUsed)
+	{
+		Log(s: "[ERROR] Invalid vector index at mathVec2GetX");
+		return -1;
+	}
+	if (mVectorData[v][0] < 2)
+	{
+		Log(s: "[ERROR] Invalid Vector size in mathVec2GetX");
+		return -1;
+	}
+	return mVectorValues[v][1];
+}
+
+function bool mathVec2SetX(int v, int val)
+{
+	if (v < 0 || v >= mVectorsUsed)
+		return MATH_FALSE;
+	if (mVectorData[v][0] < 2)
+		return MATH_FALSE;
+	
+	mVectorValues[v][0] = val;
+	return MATH_TRUE;
+}
+
+function bool mathVec2SetY(int v, int val)
+{
+	if (v < 0 || v >= mVectorsUsed)
+		return MATH_FALSE;
+	if (mVectorData[v][0] < 2)
+		return MATH_FALSE;
+	
+	mVectorValues[v][1] = val;
+	return MATH_TRUE;
+}
+
+//Create a 3D Vector
+function int mathCreateVec3(int type, int x, int y, int z)
+{
+	int index =  mathCreateVector(3, type);
+	if (index < 0)
+		return -1;
+	
+	mathVectorSetValue(index, 0, x);
+	mathVectorSetValue(index, 1, y);
+	mathVectorSetValue(index, 2, z);
+	
+	return index;
+}
+
+function int mathVec3GetX(int v)
+{
+	return mathVec2GetX(v); //just an alias
+}
+
+function int mathVec3GetY(int v)
+{
+	return mathVec2GetY(v); //just an alias
+}
+
+function int mathVec3GetZ(int v)
+{
+	if (v < 0 || v >= mVectorsUsed)
+	{
+		Log(s: "[ERROR] Invalid vector index at mathVec2GetX");
+		return -1;
+	}
+	if (mVectorData[v][0] < 3)
+	{
+		Log(s: "[ERROR] Invalid Vector size in mathVec2GetX");
+		return -1;
+	}
+	return mVectorValues[v][2];
+}
+
+function bool mathVec3SetX(int v, int val)
+{
+	return mathVec2SetX(v, val);
+}
+
+function bool mathVec3SetY(int v, int val)
+{
+	return mathVec2SetY(v, val);
+}
+
+function bool mathVec3SetZ(int v, int val)
+{
+	if (v < 0 || v >= mVectorsUsed)
+		return MATH_FALSE;
+	if (mVectorData[v][0] < 2)
+		return MATH_FALSE;
+	
+	mVectorValues[v][2] = val;
+	return MATH_TRUE;
+}
+
+
+/*
+*	Performs cross multiplication between two vectors
+*
+*	@param out - the index of the vector where the values are going to be saved
+*	@param v - index of the first vector
+*	@param u - index of the second vector
+*
+*	@return bool - [TRUE if the cross multiplication was performed]
+**/
+
+function bool mathVec3CrossMult(int out, int v, int u)
+{
+	if (out < 0 || out >= mVectorsUsed || v < 0 || v >= mVectorsUsed || u < 0 || u >= mVectorsUsed)
+		return MATH_FALSE;
+	
+	if (mVectorData[v][0] != 3 || mVectorData[v][0] != mVectorData[u][0] || mVectorData[v][0] != mVectorData[out][0])
+		return MATH_FALSE; //Only for vectors with 3 dimensions
+		
+	int tmpX, tmpY, tmpZ;
+	tmpX = FixedMul(mathVectorGetFloatVal(v, 1), mathVectorGetFloatVal(u, 2)) - FixedMul(mathVectorGetFloatVal(u, 1), mathVectorGetFloatVal(v, 2));
+	tmpY = FixedMul(mathVectorGetFloatVal(u, 0), mathVectorGetFloatVal(v, 2)) -  FixedMul(mathVectorGetFloatVal(v, 0), mathVectorGetFloatVal(u, 2));
+	tmpZ = FixedMul(mathVectorGetFloatVal(v, 0), mathVectorGetFloatVal(u, 1)) - FixedMul(mathVectorGetFloatVal(u, 0), mathVectorGetFloatVal(v, 1));
+
+	switch (mVectorData[out][1])
+	{
+		case MATH_FLOAT:
+			mVectorValues[out][0] = tmpX;
+			mVectorValues[out][1] = tmpY;
+			mVectorValues[out][2] = tmpZ;
+		break;
+			
+		case MATH_INTEGER: //just for readability
+		default:
+			mVectorValues[out][0] = mathFixedRound(tmpX);
+			mVectorValues[out][1] = mathFixedRound(tmpY);
+			mVectorValues[out][2] = mathFixedRound(tmpZ);
+		break;
+	}
+	
+	return MATH_TRUE;
+}
